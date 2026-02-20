@@ -1,0 +1,9 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+  </Configurations>
+  <Project Path="BillsOnline.csproj" Id="c7e90f33-7b26-a2a0-e1c6-908a3a72c1af">
+    <Platform Solution="*|x64" Project="x64" />
+  </Project>
+</Solution>
