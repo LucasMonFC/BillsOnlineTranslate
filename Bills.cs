@@ -13,13 +13,38 @@ internal class Bills {
     private BillsState state;
     private int index;
 
-    int totalBytesDownloaded;
     Coroutine routine;
 
     private bool reconnect;
-    private bool downloaded;
+
+    private enum TimeType {
+        RealTime,
+        GameTime,
+        Date,
+        COUNT,
+    }
+    private enum TimeType2 {
+        _12H,
+        _24H,
+        COUNT,
+    }
+    private TimeType timeType;
+    private TimeType2 timeType2;
 
     private FsmFloat bankAccount;
+    private FsmInt day;
+    private FsmInt hour;
+    private FsmFloat minutes;
+    private FsmFloat timeScale;
+
+    private readonly string[] DAYS = new string[] { "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday" };
+    
+    private const float SECONDS_PER_MINUTE = 60f;
+    private const float MINUTES_PER_HOUR = 60f;
+    private const float HOURS_PER_DAY = 24;
+
+    private const float SECONDS_PER_HOUR = SECONDS_PER_MINUTE * MINUTES_PER_HOUR; //  3600
+    private const float SECONDS_PER_DAY = SECONDS_PER_HOUR * HOURS_PER_DAY;       // 86400
 
     public void load() {
         // Load diskette texture
@@ -36,19 +61,19 @@ internal class Bills {
 
         Transform t1 = GameObject.Find("Systems/PhoneBills1").transform;
         PhoneBill phoneBill1 = new PhoneBill();
-        phoneBill1.load("Phone Bill 1", t1);
+        phoneBill1.load("House Phone Bill", t1);
 
         Transform t2 = GameObject.Find("Systems/PhoneBills2").transform;
         PhoneBill phoneBill2 = new PhoneBill();
-        phoneBill2.load("Phone Bill 2", t2);
+        phoneBill2.load("Apartment Phone Bill", t2);
 
         Transform t3 = GameObject.Find("Systems/ElectricityBills1").transform;
         ElectricityBill electricityBill1 = new ElectricityBill();
-        electricityBill1.load("Electricity Bill 1", t3);
+        electricityBill1.load("House Electricity Bill", t3);
 
         Transform t4 = GameObject.Find("Systems/ElectricityBills2").transform;
         ElectricityBill electricityBill2 = new ElectricityBill();
-        electricityBill2.load("Electricity Bill 2", t4);
+        electricityBill2.load("Apartment Electricity Bill", t4);
 
         bills = new List<IBill>();
         bills.Add(phoneBill1);
@@ -57,6 +82,14 @@ internal class Bills {
         bills.Add(electricityBill2);
 
         bankAccount = PlayMakerGlobals.Instance.Variables.GetFsmFloat("PlayerBankAccount");
+
+        day = PlayMakerGlobals.Instance.Variables.GetFsmInt("GlobalDay");
+        hour = PlayMakerGlobals.Instance.Variables.GetFsmInt("GlobalHour");
+        minutes = PlayMakerGlobals.Instance.Variables.GetFsmFloat("ClockMinutes");
+        timeScale = PlayMakerGlobals.Instance.Variables.GetFsmFloat("GlobalTimeScale");
+
+        timeType = TimeType.RealTime;
+        timeType2 = TimeType2._12H;
     }
 
     private IEnumerator processPaymentAsync() {
@@ -139,6 +172,73 @@ internal class Bills {
         I386.POS_WriteNewLine("                                   Bills Online");
         I386.POS_WriteNewLine("--------------------------------------------------------------------------------");
     }
+    private void printDueDate(float due) {
+        float REAL_TO_GAME = SECONDS_PER_HOUR / timeScale.Value;
+        int dueHour;
+        int dueMinute;
+        switch (timeType) {
+
+            case TimeType.Date:
+                float inGameSecondsUntilDue = due * REAL_TO_GAME;
+                float currentInGameSeconds = (hour.Value * SECONDS_PER_HOUR) + (minutes.Value * SECONDS_PER_MINUTE);
+                float totalInGameSeconds = currentInGameSeconds + inGameSecondsUntilDue;
+                int daysLater = (int)(totalInGameSeconds / SECONDS_PER_DAY);
+                float secondsIntoDay = totalInGameSeconds % SECONDS_PER_DAY;
+                dueHour = (int)(secondsIntoDay / SECONDS_PER_HOUR);
+                dueMinute = (int)((secondsIntoDay % SECONDS_PER_HOUR) / SECONDS_PER_MINUTE);
+                int dayIndex = ((day.Value + daysLater) % 7 + 7) % 7;
+                string dueDayName = DAYS[dayIndex];
+                int weekOffset = (day.Value + daysLater) / 7;
+
+                string weekString;
+                string dayString;
+                if (daysLater > 7) {
+                    weekString = $"In {weekOffset} week(s) on ";
+                    dayString = dueDayName;
+                }
+                else if (daysLater == 7) {
+                    weekString = $"Next week on ";
+                    dayString = dueDayName;
+                }
+                else {
+                    weekString = "";
+                    if (daysLater == 0)
+                        dayString = "Today";
+                    else if (daysLater == 1)
+                        dayString = "Tomorrow";
+                    else
+                        dayString = dueDayName;
+                }
+
+                switch (timeType2) {
+                    case TimeType2._24H:
+                        I386.POS_WriteNewLine($"{weekString}{dayString} at {dueHour}:{dueMinute:D2}");
+                        break;
+                    case TimeType2._12H:
+                        string ampm = dueHour < 12 ? "AM" : "PM";
+                        int hour12 = dueHour % 12;
+                        if (hour12 == 0) {
+                            hour12 = 12;
+                        }
+                        I386.POS_WriteNewLine($"{weekString}{dayString} at {hour12}:{dueMinute:D2} {ampm}");
+                        break;
+                }
+                break;
+
+            case TimeType.RealTime:
+                dueHour = (int)(due / SECONDS_PER_HOUR);
+                dueMinute = (int)((due % SECONDS_PER_HOUR) / SECONDS_PER_MINUTE);
+                I386.POS_WriteNewLine($"{dueHour}h {dueMinute:D2}m (real time)");
+                break;
+
+            case TimeType.GameTime:
+                due *= REAL_TO_GAME;
+                dueHour = (int)(due / SECONDS_PER_HOUR);
+                dueMinute = (int)((due % SECONDS_PER_HOUR) / SECONDS_PER_MINUTE);
+                I386.POS_WriteNewLine($"{dueHour}h {dueMinute:D2}m (game time)");
+                break;
+        }
+    }
 
     private void viewBill(IBill bill) {
         if (I386.GetKeyDown(KeyCode.LeftArrow)) {
@@ -153,7 +253,23 @@ internal class Bills {
                 index = 0;
             }
         }
-
+        if (I386.GetKeyDown(KeyCode.T)) {
+            if (timeType >= TimeType.COUNT - 1) {
+                timeType = 0;
+            }
+            else {
+                timeType++;
+            }
+        }
+        if (I386.GetKeyDown(KeyCode.Y)) {
+            if (timeType2 >= TimeType2.COUNT - 1) {
+                timeType2 = 0;
+            }
+            else {
+                timeType2++;
+            }
+        }
+        
         if (I386.ModemConnected) {
             if (reconnect) {
                 state = BillsState.Connect;
@@ -169,7 +285,7 @@ internal class Bills {
         I386.POS_WriteNewLine($"   {bill.name}\n");
         I386.POS_WriteNewLine($"   Definition\t\t\t\t\t\tQuantity\t\tPrice MK\t\tTotal MK\n");
 
-        if (bill.unpaidAmount > 1) {
+        if (bill.isActive) {
             bill.view();
 
             if (I386.GetKeyDown(KeyCode.Space)) {
@@ -177,36 +293,37 @@ internal class Bills {
                 return;
             }
 
-            I386.POS_Write($"\t\t\t\t\t\t\t\t[PAY NOW] ");
-            if (bill.timeUntilCutOff <= 0) {
-                I386.POS_WriteNewLine($"Overdue");
+            I386.POS_WriteNewLine("\n                                                                    [PAY NOW] ");
+            if (bill.isCutOff) {
+                I386.POS_WriteNewLine("   Overdue");
             }
             else {
-                I386.POS_WriteNewLine($"Due: {bill.timeUntilCutOff}");
+                I386.POS_Write("   Due: ");
+                printDueDate(bill.timeUntilCutOff);
             }
         }
         else {
-            I386.POS_WriteNewLine($"\t\t\t\t\t\t\tInvoice not ready. Due: {bill.timeUntilNextBill}");
+            I386.POS_WriteNewLine("   Invoice not ready");
+            I386.POS_Write("   Due: ");
+            printDueDate(bill.timeUntilNextBill);
         }
     }
     private void viewNotConnected() {
         viewHeader();
-        I386.POS_WriteNewLine("                                   Bills Online");
-        I386.POS_WriteNewLine("--------------------------------------------------------------------------------");
-        I386.POS_WriteNewLine($"                                  Not Connected");
-        I386.POS_WriteNewLine($"                              Press Space to Connect");
+        I386.POS_WriteNewLine("                                   Not Connected");
+        I386.POS_WriteNewLine("                               Press Space to Connect");
         if (I386.GetKeyDown(KeyCode.Space)) {
             state = BillsState.Connect;
         }
     }
     private void viewConnect() {
         viewHeader();
-        I386.POS_WriteNewLine($"                                  Connecting...");
+        I386.POS_WriteNewLine("                                   Connecting...");
         connect();
     }
     private void viewPaymentProcessing() {
         viewHeader();
-        I386.POS_WriteNewLine($"                                Processing Payment...");
+        I386.POS_WriteNewLine("                               Processing Payment...");
         processPayment();
     }
     private void viewPaymentSuccess() {

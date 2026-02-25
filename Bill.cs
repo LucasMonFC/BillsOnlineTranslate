@@ -7,9 +7,10 @@ namespace BillsOnline;
 
 internal interface IBill {
     public string name { get; }
-    public float unpaidAmount { get; }
     public float timeUntilNextBill { get; }
     public float timeUntilCutOff { get; }
+    public bool isActive { get; }
+    public bool isCutOff { get; }
 
     public float getPrice();
     public void pay();
@@ -17,6 +18,8 @@ internal interface IBill {
 }
 internal class PhoneBill : IBill {
     public PlayMakerFSM fsm;
+
+    public FsmGameObject envelope;
 
     public FsmFloat localMinutes;
     public FsmFloat pricePerLocalMinute;
@@ -28,9 +31,6 @@ internal class PhoneBill : IBill {
     public FsmFloat callsLong;
     public FsmFloat pricePerLongCall;
 
-    public FsmFloat unpaidBill;
-    public FsmBool paid;
-
     public FsmFloat nextBill;
     public FsmFloat nextCutOff;
 
@@ -38,10 +38,12 @@ internal class PhoneBill : IBill {
     public FsmFloat waitCutOff;
 
     private string _name;
+
     public string name => _name;
-    public float unpaidAmount => unpaidBill.Value;
     public float timeUntilNextBill => nextBill.Value - waitBill.Value;
     public float timeUntilCutOff => nextCutOff.Value - waitCutOff.Value;
+    public bool isActive => envelope.Value.activeInHierarchy;
+    public bool isCutOff => timeUntilCutOff <= 0;
 
     public void load(string name, Transform transform) {
         _name = name;
@@ -57,14 +59,13 @@ internal class PhoneBill : IBill {
         pricePerLongMinute = fsm.GetVariable<FsmFloat>("PriceMKperMinuteLong");
         pricePerLongCall = fsm.GetVariable<FsmFloat>("PriceMKperConnectLong");
 
-        paid = fsm.GetVariable<FsmBool>("PhonePaid");
-        unpaidBill = fsm.GetVariable<FsmFloat>("UnpaidBills");
-
         nextCutOff = fsm.GetVariable<FsmFloat>("NextCutoff");
         nextBill = fsm.GetVariable<FsmFloat>("NextBill");
 
         waitCutOff = fsm.GetVariable<FsmFloat>("WaitCutoff");
         waitBill = fsm.GetVariable<FsmFloat>("WaitBill");
+
+        envelope = fsm.GetVariable<FsmGameObject>("Bill");
     }
 
     public float getPrice() {
@@ -96,9 +97,10 @@ internal class PhoneBill : IBill {
 
 internal class ElectricityBill : IBill {
     public PlayMakerFSM fsm;
+    
+    public FsmGameObject envelope;
 
     public FsmFloat pricePerKWH;
-
     public FsmFloat unpaidBill;
 
     public FsmFloat nextBill;
@@ -108,10 +110,13 @@ internal class ElectricityBill : IBill {
     public FsmFloat waitCutOff;
 
     private string _name;
+
     public string name => _name;
     public float unpaidAmount => unpaidBill.Value;
     public float timeUntilNextBill => nextBill.Value - waitBill.Value;
-    public float timeUntilCutOff => nextCutOff.Value - waitCutOff.Value;
+    public float timeUntilCutOff => nextCutOff.Value - waitCutOff.Value;    
+    public bool isActive => envelope.Value.activeInHierarchy;
+    public bool isCutOff => timeUntilCutOff <= 0;
 
     public float KWH => unpaidBill.Value / pricePerKWH.Value;
 
@@ -127,6 +132,8 @@ internal class ElectricityBill : IBill {
 
         waitCutOff = fsm.GetVariable<FsmFloat>("WaitCutoff");
         waitBill = fsm.GetVariable<FsmFloat>("WaitBill");
+
+        envelope = fsm.GetVariable<FsmGameObject>("Bill");
     }
 
     public float getPrice() {
