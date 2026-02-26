@@ -94,7 +94,7 @@ internal class PhoneBill : IBill {
 
         I386.POS_WriteNewLine("++ " + localize("Basic subscription fee") + ":\t\t\t1\t\t\t\t128 MK\t\t\t128 MK");
 
-        I386.POS_WriteNewLine($"++ {localize("Local calls (min):")}\t\t\t\t{Mathf.RoundToInt(localMinutes.Value)}\t\t\t\t{pricePerLocalMinute.Value.ToString("F2")} MK\t\t\t{(localMinutes.Value * pricePerLocalMinute.Value).ToString("F2")} MK");
+        I386.POS_WriteNewLine($"++ {localize("Local calls (min):")}\t\t\t{Mathf.RoundToInt(localMinutes.Value)}\t\t\t\t{pricePerLocalMinute.Value.ToString("F2")} MK\t\t\t{(localMinutes.Value * pricePerLocalMinute.Value).ToString("F2")} MK");
         I386.POS_WriteNewLine($"++ {localize("Local calls (number):")}\t\t\t{Mathf.RoundToInt(callsLocal.Value)}\t\t\t\t{pricePerLocalCall.Value.ToString("F2")} MK\t\t\t{(callsLocal.Value * pricePerLocalCall.Value).ToString("F2")} MK");
 
         I386.POS_WriteNewLine($"++ {localize("Long distance calls (min):")}\t\t{Mathf.RoundToInt(longMinutes.Value)}\t\t\t\t{pricePerLongMinute.Value.ToString("F2")} MK\t\t\t{(longMinutes.Value * pricePerLongMinute.Value).ToString("F2")} MK");
