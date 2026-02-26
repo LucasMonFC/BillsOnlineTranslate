@@ -86,7 +86,6 @@
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
-    <None Include="build-and-copy.ps1" />
     <None Include="Mods\Config\Mod Settings\BillsOnline\translate.json" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
